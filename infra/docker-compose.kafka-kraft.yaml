@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  kafka-0:
+    image: bitnamilegacy/kafka:2.8.1
+    container_name: kafka-course-kraft
+    ports:
+      - "9094:9094"
+    environment:
+      - KAFKA_ENABLE_KRAFT=yes
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_NODE_ID=0
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka-0:9093
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-0:9092,EXTERNAL://127.0.0.1:9094
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_BROKER_ID=2
+    volumes:
+      - kafka_0_data:/bitnami/kafka
+
+#  ui:
+#    image: provectuslabs/kafka-ui:latest
+#    depends_on:
+#      - kafka-0
+#    container_name: kafka-ui-course-kraft
+#    ports:
+#      - "8080:8080"
+#    environment:
+#      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka-0:9092
+#      - KAFKA_CLUSTERS_0_NAME=kraft
+
+volumes:
+  kafka_0_data:
