@@ -46,6 +46,51 @@ kafka-course-kraft exited with code 1
 ```
 
 
+# Kafka cluster checkup
+
+1. Получаем список docker-cервисов
+
+```bash
+docker ps
+```
+
+В выводе ищем контейнер брокера и записываем его container name: **kafka-course**
+
+2. Заходим в брокер контейнер
+
+```bash
+-- kafka-course - имя вашего контейнера
+docker exec -it kafka-course /bin/bash
+```
+
+3. Получаем список топиков (ожидаемо пусто, тк не создали еще ни одного)
+
+```bash
+-- kafka-topics стандартная команда kafka
+-- kafka:9092 - <service-name in docker-compose.yaml>:<interval-kafka-port> or KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS in kafka-ui
+kafka-topics  --list --bootstrap-server kafka:9092
+```
+
+## Use config params
+
+```yaml
+    environment:
+      KAFKA_BROKER_ID: 1 # идентификатор брокера - чтобы сообщить всем что есть такой
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181" # где находиться координатор, чтобы сообщшать/получать информацию
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT # настройка протоколов для лисенеров, настроены простые лисенеры без авторизации
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092 # дополнительная настройка лисенеров
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL # по какому имени обращаться к кафке изнутри сети
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # фактор репликации - будет ли отказоусточивость 
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false" # автосоздание топиков при первой отправке сообщений, выключено
+```
+
+## Kafka-UI
+
+Проверить доступность UI по адресу: http://127.0.0.1:8080
+
 
 -----------
 
