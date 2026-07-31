@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 producer_config = {
    'bootstrap.servers': os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092,127.0.0.1:9093"),
-    "acks": 1,  # at least once, ждем подтверждение от 1 реплики
+    'acks': 1,  # at least once, ждем подтверждение от 1 реплики
+    'retries': 3
 }
 
 

@@ -43,7 +43,7 @@ docker compose -f docker-compose.kafka.yaml up -d
 
 Когда увидишь, что всё стартануло:
 
-<картинка>
+![t3-complete.png](../../img/t3-complete.png)
 
 Переходи в Kafka-UI: http://127.0.0.1:8081 и разглядывай что producer пишет или загляни в логи producer/consumer чтобы видет, что у них всё ОК
 
@@ -55,6 +55,11 @@ docker ps | grep ''
 docker logs -f <producer-container-name>
 docker logs -f <consumer_single-container-name>
 ```
+
+## Скрин работы
+
+![t3-overview.png](../../img/t3-overview.png)
+
 
 # Хочешь детали, залетай под кат
 
@@ -326,4 +331,47 @@ cimpl.KafkaException: KafkaError{code=_INVALID_ARG,val=-186,str="No such configu
 
 ```python
 consumer.consume(num_messages=int(os.getenv("MSG_BATCH_SIZE", 10)), timeout=1.0)
+```
+
+Итог: остановился на таких настройках
+
+```json
+    'fetch.min.bytes': 1048576, # 1MB
+    'fetch.wait.max.ms': 30000
+```
+
+Batch consumer мало чем отличается от Single, отличия ниже:
+
+```python
+# добавился counter для логгирования размера обработанного батча
+        while running:
+            msg = consumer.poll(timeout=1.0)
+            if msg is None:
+                counter = 0
+                continue
+
+            ...
+            else:
+                try:
+                    message_process(msg)
+                    # самостоятельный коммит
+                    consumer.commit(asynchronous=False)
+                    counter+=1
+                except Exception as e:
+                    logger.error(f'Error during message processing: {str(e)}')
+            
+            # вывод в лог размер бачта
+            logger.info(f'[BATCH CONSUMER] Processed messages: {counter}')
+```
+
+
+--------------
+
+
+Про параметр `replicas` не очень понятно из ТЗ к какому приложению применять, выставил для single consumer
+
+```yaml
+  single-message-consumer:
+    deploy:
+      replicas: 2
 ```
