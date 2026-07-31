@@ -158,7 +158,8 @@ def main():
            logger.info(f"Message delivered to {msg.topic()} [{msg.partition()}]")
 
     while True:
-        if time.time() % 10 != 0:
+        tick = int(os.getenv("PRODUCER_TICK_MS", 1000))
+        if (1000.0 * time.time()) % tick != 0:
             continue
 
         # доходим сюда раз в 10 секунд -  для тестов достаточно

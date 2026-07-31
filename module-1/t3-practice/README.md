@@ -118,6 +118,18 @@ docker logs -f <consumer_single-container-name>
         kafka-topics --describe --topic topic.events.v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
 ```
 
+Все приложения стартуют после готовности `kafka-init`:
+
+```yaml
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+```
+
+Первоначально producer/consumer стартовали после брокеров и schema-registry и было страннное поведение:
+- producer отправлял сообщения успешно
+- консьюмер падал, тк на момент его запуска топика еще не было
+
 
 ## Producer
 
@@ -296,3 +308,22 @@ def main():
 ![t3-batch-processing.png](../../img/t3-batch-processing.png)
 
 Приложение (код + Dockerfile) тут [consumer_batch](docker/consumer_batch)
+
+Особенности:
+- коммитом теперь управляем сами `'enable.auto.commit': 'false'`
+- копим батчи и обрабатываем пачкой
+
+Какие у нас варианты:
+
+`fetch.min.bytes` - минимальное кол-во байт
+
+По свойству `fetch.max.wait.ms` получил ошибку, корректный параметр `fetch.wait.max.ms`
+```
+cimpl.KafkaException: KafkaError{code=_INVALID_ARG,val=-186,str="No such configuration property: "fetch.max.wait.ms""}
+```
+
+для стандартного консьюмера Consumer есть метод, который позволяет получать пачку сообщений
+
+```python
+consumer.consume(num_messages=int(os.getenv("MSG_BATCH_SIZE", 10)), timeout=1.0)
+```

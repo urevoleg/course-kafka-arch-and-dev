@@ -79,9 +79,9 @@ def message_process(message: Message) -> None:
 
     match value.data.status:
         case FreshnessStatus.WARN:
-            logger.warning(f'⚠️ Warning for freshness by source: {value.data.unique_id}')
+            logger.warning(f'[SINGLE CONSUMER]⚠️ Warning for freshness by source: {value.data.unique_id}')
         case FreshnessStatus.ERROR:
-            logger.error(f'🚫 Error for freshness by source: {value.data.unique_id}')
+            logger.error(f'[SINGLE CONSUMER]🚫 Error for freshness by source: {value.data.unique_id}')
         case _:
             pass
 

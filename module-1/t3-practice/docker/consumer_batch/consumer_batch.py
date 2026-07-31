@@ -23,11 +23,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-consumer_conf = {'bootstrap.servers': os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092,127.0.0.1:9093"),
-        'group.id': 'consumer_batch',
-        'enable.auto.commit': 'false',
-        'enable.auto.offset.store': 'false',
-        'auto.offset.reset': 'latest'}
+consumer_conf = {
+    'bootstrap.servers': os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092,127.0.0.1:9093"),
+    'group.id': 'consumer_batch',
+    'enable.auto.commit': 'false',
+    'enable.auto.offset.store': 'true',
+    'auto.offset.reset': 'latest',
+    'fetch.min.bytes': 1048576, # 1MB
+    'fetch.wait.max.ms': 30000
+}
 
 
 schema_registry_config = {
@@ -79,9 +83,9 @@ def message_process(message: Message) -> None:
 
     match value.data.status:
         case FreshnessStatus.WARN:
-            logger.warning(f'⚠️ Warning for freshness by source: {value.data.unique_id}')
+            logger.warning(f'[BATCH CONSUMER] ⚠️ Warning for freshness by source: {value.data.unique_id}')
         case FreshnessStatus.ERROR:
-            logger.error(f'🚫 Error for freshness by source: {value.data.unique_id}')
+            logger.error(f'[BATCH CONSUMER]🚫 Error for freshness by source: {value.data.unique_id}')
         case _:
             pass
 
@@ -95,9 +99,13 @@ def basic_consume_loop(consumer: DeserializingConsumer | Consumer, topics: t.Lis
     try:
         consumer.subscribe(topics)
 
+        counter = 0
+
         while running:
             msg = consumer.poll(timeout=1.0)
-            if msg is None: continue
+            if msg is None:
+                counter = 0
+                continue
 
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
@@ -110,8 +118,12 @@ def basic_consume_loop(consumer: DeserializingConsumer | Consumer, topics: t.Lis
             else:
                 try:
                     message_process(msg)
+                    consumer.commit(asynchronous=False)
+                    counter+=1
                 except Exception as e:
                     logger.error(f'Error during message processing: {str(e)}')
+
+            logger.info(f'[BATCH CONSUMER] Processed messages: {counter}')
     finally:
         # Close down consumer to commit final offsets.
         consumer.close()
