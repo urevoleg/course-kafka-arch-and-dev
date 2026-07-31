@@ -34,7 +34,7 @@ def create_topic(topic_name: str = None) -> NewTopic:
         "bootstrap.servers": os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092")
     })
     topic = NewTopic(topic=topic_name,
-                     num_partitions=5,
+                     num_partitions=1,
                      replication_factor=2,
                      config={"min.insync.replicas": "2"}
                      )
@@ -67,6 +67,6 @@ def produce(topic: NewTopic, n: int = 1):
 
 
 if __name__ == "__main__":
-    topic = create_topic(topic_name="t2.l6.topic.part.5")
+    topic = create_topic(topic_name="t2.l7.topic")
     logger.info(topic)
     produce(topic=topic)
