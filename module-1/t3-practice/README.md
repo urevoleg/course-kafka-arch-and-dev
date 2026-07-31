@@ -60,6 +60,16 @@ docker logs -f <consumer_single-container-name>
 
 ![t3-overview.png](../../img/t3-overview.png)
 
+Посмотреть видео работы [practice-2 [откроется в браузере]](https://storage.yandexcloud.net/public-bucket-6/course-kafka-arch-and-dev/practice-2.mp4)
+
+
+Consumer lag показывает разницу в обработке между single/batch consumer:
+
+![t3-consumer-lag.png](../../img/t3-consumer-lag.png)
+
+У batch копиться лаг.
+
+
 
 # Хочешь детали, залетай под кат
 
