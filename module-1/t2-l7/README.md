@@ -163,3 +163,22 @@ Done, схему приняли, сообщение отправили:
 2 сообщения с разной схемой
 
 ![](../../img/t2-l7-message-with-change-schema.png)
+
+
+## Подробнее про schema-compatibility
+
+Статья на [хабр](https://habr.com/ru/articles/817121/)
+
+Саммари:
+* Backward Compatibility: Обеспечивает совместимость с предыдущими версиями схемы. Отлично подходит, когда нужно минимизировать изменения в данных.
+* Forward Compatibility: Обеспечивает совместимость с будущими версиями схемы. Полезно при частых обновлениях схем.
+* Full Compatibility: Объединяет плюсы Backward и Forward Compatibility, обеспечивая совместимость с предыдущими и будущими версиями схемы. Максимум гибкости и стабильности!
+* Full Transitive Compatibility: Максимально строгий и надежный тип совместимости, обеспечивающий, что данные любой версии схемы могут быть прочитаны любой другой версией схемы. Абсолютный чемпион по совместимости!
+
+Golden path можно считать `Full Compatibility`
+
+
+## Доп чтение от курса
+
+1. [How Producers Work: Kafka Producer and Consumer Internals](https://www.confluent.io/blog/kafka-producer-internals-preparing-event-data/)
+2. [Consumer Group Protocol](https://developer.confluent.io/courses/architecture/consumer-group-protocol/)
