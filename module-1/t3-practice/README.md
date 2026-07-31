@@ -200,5 +200,99 @@ ps: пока producer живет в 1 файле, читаемость низк�
 ![](../../img/t3-test-producer.png)
 
 
+Полный код producer приложения находится тут [producer.py](docker/producer/producer.py), сборка контейнера тут [producer](docker/producer)
+
+У приложения есть настраиваемые параметры, они указываются как переменные среды и могут быть указаны в docker-compose файле:
+```yaml
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29093
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KAFKA_TOPIC: dev.topic.events.v1
+```
 
 
+## SingleMessageConsumer
+
+Приложение (код + Dockerfile) тут [consumer_single](docker/consumer_single)
+
+Ознакомился с официальной [докой](https://docs.confluent.io/kafka-clients/python/current/overview.html#basic-poll-loop), пример взят из неё.
+
+Главные методы:
+- `consumer.subscribe(topics)` - говорим консьюмеру что читать
+- в бесконечном цикле запрашиваем сообщения из топиков
+
+```python
+        while running:
+            msg = consumer.poll(timeout=1.0)
+```
+
+`poll` - обращается к брокерам и опрашивает их на предмет наличия новых сообщений, ждет указанный таймаут (`timeout=1.0`), если за его период сообщений не 
+получено, то возвращается пустота
+
+
+Доработки basic-pool-loop относительно ТЗ:
+
+- логгирование всех ошибок
+
+```python
+            if msg.error():
+                if msg.error().code() == KafkaError._PARTITION_EOF:
+                    # End of partition event
+                    logger.error('%% %s [%d] reached end at offset %d\n' %
+                                     (msg.topic(), msg.partition(), msg.offset()))
+                elif msg.error():
+                    # raise KafkaException(msg.error())
+                    logger.error(f'Error: {msg.error().code()}')
+            else:
+                try:
+                    message_process(msg)
+                except Exception as e:
+                    logger.error(f'Error during message processing: {str(e)}')
+```
+
+- кастомный обработчик сообщений (просто логируем WARN/ERROR события)
+
+```python
+def message_process(message: Message) -> None:
+    value = message.value()
+    logger.info(f'Processing message: {value}')
+
+    match value.data.status:
+        case FreshnessStatus.WARN:
+            logger.warning(f'⚠️ Warning for freshness by source: {value.data.unique_id}')
+        case FreshnessStatus.ERROR:
+            logger.error(f'🚫 Error for freshness by source: {value.data.unique_id}')
+        case _:
+            pass
+```
+
+Всё вместе вызывается в основной функции `main()`:
+
+```python
+def main():
+    topic = os.getenv("KAFKA_TOPIC", "dev.topic.events.v1")
+
+    # Инициализация клиента Schema Registry
+    schema_registry_client = SchemaRegistryClient(schema_registry_config)
+
+    json_deserializer = JSONDeserializer(json.dumps(CloudEvent.model_json_schema()),
+                                         lambda data, ctx: CloudEvent(**data),
+                                         schema_registry_client,)
+
+    consumer_conf.update({
+        'key.deserializer': StringDeserializer('utf_8'),
+        'value.deserializer': json_deserializer,
+    })
+
+    with DeserializingConsumer(consumer_conf) as consumer:
+        basic_consume_loop(consumer=consumer, topics=[topic])
+```
+
+настройка десериалайзера, обновление конфигурации консьюмера и использование контекстного мессенджера для консьюмера (узнано из доки)
+
+
+## BatchMessageConsumer
+
+![t3-batch-processing.png](../../img/t3-batch-processing.png)
+
+Приложение (код + Dockerfile) тут [consumer_batch](docker/consumer_batch)

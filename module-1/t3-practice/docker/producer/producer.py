@@ -27,8 +27,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-kafka_config = {
-   'bootstrap.servers': os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092,127.0.0.1:9093")
+producer_config = {
+   'bootstrap.servers': os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092,127.0.0.1:9093"),
+    "acks": 1,  # at least once, ждем подтверждение от 1 реплики
 }
 
 
@@ -143,7 +144,7 @@ def main():
     json_serializer = JSONSerializer(json.dumps(CloudEvent.model_json_schema()), schema_registry_client)
 
     # Инициализация продюсера
-    producer = Producer(kafka_config)
+    producer = Producer(producer_config)
 
     # Сериализация ключа и значения
     key_serializer = StringSerializer('utf_8')
