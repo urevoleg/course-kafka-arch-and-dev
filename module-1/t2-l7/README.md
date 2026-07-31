@@ -97,3 +97,69 @@ ModuleNotFoundError: No module named 'cachetools'
 ```
 
 
+Полный пример [schema_registry_example.py](scripts/schema_registry_example.py)
+
+Изменения относительно заготовки в курсе:
+- используется pydantic для объективизации сообщений и удобного получения json-schema
+
+```python
+class Product(BaseModel):
+    id: int = Field(description="product ID")
+    name: str = Field(description="Наименование")
+```
+
+- получение json_schema_str
+
+```python
+json.dumps(Product.model_json_schema())
+```
+
+- сообщение для отправки
+
+```python
+# Сообщение для отправки
+message_value = Product(id=30, name="product").model_dump()
+```
+
+### Проверка
+
+Схема зарегистрирована
+
+![](../../img/t2-l7-sr-in-kafka.png)
+
+
+## Изменение схемы сообщения
+
+Добавление нового поля ломает отправку, даже не отправку, а регистрацию новой схемы
+
+```python
+class Product(BaseModel):
+    id: int = Field(description="product ID")
+    name: str = Field(description="Наименование")
+    description: str | None = Field(default="", description="Описание товара")
+```
+
+По дефолту схема создается в режиме 
+
+```json
+{
+	"subject": "topic.events.v1-value",
+	"compatibilityLevel": "BACKWARD"
+}
+```
+
+Это запрещает добавлять необязательные поля, одно из решений: сменить тип на `FORWARD`
+
+```bash
+curl -X PUT http://localhost:8081/config/topic.events.v1-value \
+  -H "Content-Type: application/json" \
+  -d '{"compatibility": "FORWARD"}'
+```
+
+Done, схему приняли, сообщение отправили:
+
+![](../../img/t2-l7-sr-in-kafka-change.png)
+
+2 сообщения с разной схемой
+
+![](../../img/t2-l7-message-with-change-schema.png)
