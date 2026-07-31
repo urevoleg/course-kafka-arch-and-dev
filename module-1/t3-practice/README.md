@@ -19,8 +19,17 @@ ps: хотя и курс и обучение - это процесс, но ко�
 ├── README.md
 ├── docker
 │   ├── consumer_batch
+│   │   ├── Dockerfile
+│   │   ├── consumer_batch.py
+│   │   └── requirements.txt
 │   ├── consumer_single
+│   │   ├── Dockerfile
+│   │   ├── consumer_single.py
+│   │   └── requirements.txt
 │   └── producer
+│       ├── Dockerfile
+│       ├── producer.py
+│       └── requirements.txt
 ├── docker-compose.kafka.yaml
 └── topics.txt
 ```
@@ -45,7 +54,7 @@ docker compose -f docker-compose.kafka.yaml up -d
 
 ![t3-complete.png](../../img/t3-complete.png)
 
-Переходи в Kafka-UI: http://127.0.0.1:8081 и разглядывай что producer пишет или загляни в логи producer/consumer чтобы видет, что у них всё ОК
+Переходи в Kafka-UI: http://127.0.0.1:8081 и разглядывай что producer пишет или загляни в логи producer/consumer чтобы видеть, что у них всё ОК
 
 3. Заглянуть в логи
 
