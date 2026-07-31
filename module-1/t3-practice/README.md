@@ -1,0 +1,204 @@
+# Практическая работа 2
+
+
+**Тема работы:** «Настройка кластера и реализация продюсера с двумя консьюмерами». 
+
+**Цель:** применить на практике знания об основах Apache Kafka, укрепить понимание её архитектуры, ключевых компонентов и возможностей.
+
+Дисклеймером практической работы будет иллюстрация к Процессу Кафки (может и не подходит, но не упомянуть имя хорошего автора в свете хорошей технологии было бы грустно)
+
+![](../../img/t3-init.png)
+
+ps: хотя и курс и обучение - это процесс, но конец у нас всё же перспективнее =)
+
+
+## Структура
+
+```
+.
+├── README.md
+├── docker
+│   ├── consumer_batch
+│   ├── consumer_single
+│   └── producer
+├── docker-compose.kafka.yaml
+└── topics.txt
+```
+
+# How to
+
+Быстрый старт таков:
+
+1. Где бы ты ни были, погрузись в терминале в папку `t3-practice`
+
+```bash
+cd <your-folder-with-git-project>/course-kafka-arch-and-dev/module-1/t3-practice
+```
+
+2. Стартуй docker-compose и наслаждайся ~~низкокалорийным~~ попкорном и отличной работой сервисов
+
+```bash
+docker compose -f docker-compose.kafka.yaml up -d
+```
+
+Когда увидишь, что всё стартануло:
+
+<картинка>
+
+Переходи в Kafka-UI: http://127.0.0.1:8081 и разглядывай что producer пишет или загляни в логи producer/consumer чтобы видет, что у них всё ОК
+
+3. Заглянуть в логи
+
+```bash
+docker ps | grep ''
+
+docker logs -f <producer-container-name>
+docker logs -f <consumer_single-container-name>
+```
+
+# Хочешь детали, залетай под кат
+
+## Особенности docker-compose
+
+Для всех контейнеров добавлены healthcheck - хоть как-то приблизимся к production-ready:
+
+- zookeeper
+
+```yaml
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc -w 2 localhost 2181 | grep Zookeeper"] 
+```
+
+отправляем специальную команду srvr через netcat[nc] клиент, zookeeper отвечает серсвисной инфой, грепаем строку с версией сервиса - если ошибок нет, 
+считаем что сервис жив
+
+- брокеры (kafka/kafka-broker-2)
+
+```yaml
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+```
+
+используем запрос с получением Kafka API версий как сигнал, что всё ок
+
+
+- schema-registry
+
+```yaml
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c 'echo > /dev/tcp/localhost/8081' || exit 1"]
+```
+
+тут было интересно, ибо стандартные утилиты curl/wget/nc не были доступны в контейнере, честно нагуглился способ через bash
+
+
+Добавлен контейнер `kafka-init` - cоздаёт топик, чтобы он всегда был после старта кластера:
+
+```yaml
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-broker-2:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    command:
+      - /bin/bash
+      - -c
+      - |
+        kafka-topics --bootstrap-server kafka:29092,kafka-broker-2:29093 \
+          --create \
+          --if-not-exists \
+          --topic topic.events.v1 \
+          --partitions 3 \
+          --replication-factor 2
+        kafka-topics --describe --topic topic.events.v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
+```
+
+
+## Producer
+
+Будет не просто, но мы справимся)
+
+### Сообщения
+
+В качестве объектов в коде выбираем pydantic - ибо удобно валидировать/управлять из Python, также удобно получать json-schema.
+
+Для модно-молодежности используем [CloudEvent](https://github.com/cloudevents/spec) в качестве инкапсуляции payload:
+
+```python
+class CloudEvent(BaseModel):
+    """
+    Pydantic модель для сообщения в формате CloudEvents v1.0.
+    Документация: https://github.com/cloudevents/spec
+    """
+    # --- ОБЯЗАТЕЛЬНЫЕ ПОЛЯ ---
+    specversion: str = Field(default="1.0", description="Версия спецификации CloudEvents. Всегда '1.0'")
+    type: str = Field(default="dbt.source.freshness", description="Тип события (например, 'com.example.someevent')")
+    source: str = Field(default="dbt-impala", description="URI, идентифицирующий контекст-источник события")
+    id: str = Field(..., description="Уникальный идентификатор события, генерируемый источником")
+
+    # --- ОПЦИОНАЛЬНЫЕ ПОЛЯ ---
+    time: datetime | None = Field(None, description="Метка времени события в формате RFC3339")
+
+    # --- ПОЛЕ С ДАННЫМИ ---
+    data: FreshnessResultCompactModel | None = Field(None, description="Данные, специфичные для события")
+```
+
+Сами данные - это данные о проверки свежести источников (то, что получается по результатам [dbt source freshness](https://docs.getdbt.com/docs/deploy/source-freshness?version=2.0)) в упрощенном виде
+
+```python
+class FreshnessResultCompactModel(BaseModel):
+    """Компактная модель результата проверки свежести (без вложенных полей)"""
+    unique_id: str = Field(..., description="Уникальный идентификатор источника")
+    max_loaded_at: datetime = Field(..., description="Максимальное время загрузки данных")
+    snapshotted_at: datetime = Field(..., description="Время снятия снэпшота")
+    max_loaded_at_time_ago_in_s: float = Field(
+        ...,
+        description="Время в секундах с момента max_loaded_at (отрицательное - в будущем)"
+    )
+    status: FreshnessStatus = Field(..., description="Статус проверки: pass/warn/error")
+    thread_id: str = Field(..., description="ID потока выполнения")
+    execution_time: float = Field(..., description="Общее время выполнения в секундах")
+```
+
+FreshnessStatus - выбирается из Enum.
+
+Реальных данных у нас нет, поэтому делаем случайный генератор - `generate_random_freshness_event`:
+- все аргументы которые можно делаем случайными
+- источники выбираем из списка
+- статусы выбираем из списка
+- инкапсулируем в наши модели и возвращаем
+
+Код самого producer (сериализатор/отправка) взяты из примера в курсе с адаптацией под pydantic и с обработкой ошибок (try/except).
+
+ps: пока producer живет в 1 файле, читаемость низкая, но пусть остается так
+
+
+Тест producer, сообщения отправляются:
+
+```bash
+...
+2026-07-31 15:29:30,043 INFO httpx: HTTP Request: POST http://localhost:8081/subjects/dev.topic.events.v1-value/versions?normalize=False "HTTP/1.1 200 OK"
+2026-07-31 15:29:30,043 DEBUG httpcore.http11: receive_response_body.started request=<Request [b'POST']>
+2026-07-31 15:29:30,043 DEBUG httpcore.http11: receive_response_body.complete
+2026-07-31 15:29:30,043 DEBUG httpcore.http11: response_closed.started
+2026-07-31 15:29:30,043 DEBUG httpcore.http11: response_closed.complete
+2026-07-31 15:29:30,047 INFO __main__: Send: {'specversion': '1.0', 'type': 'dbt.source.freshness.v1', 'source': 'dbt.freshness', 'id': '1785500970', 'time': DateTime(2026, 7, 31, 15, 29, 30, 723, tzinfo=Timezone('Europe/Moscow')), 'data': {'unique_id': 'source.dwh_trino.prc_knaa_raw_0075_000_cloud.v_d_aum_whs_art_day_m', 'max_loaded_at': DateTime(2026, 7, 31, 15, 33, 24, tzinfo=Timezone('Europe/Moscow')), 'snapshotted_at': DateTime(2026, 7, 31, 15, 29, 30, 405, tzinfo=Timezone('Europe/Moscow')), 'max_loaded_at_time_ago_in_s': 233.999595, 'status': <FreshnessStatus.PASS: 'pass'>, 'thread_id': 'Thread-4 (worker)', 'execution_time': 0.55}}
+2026-07-31 15:29:30,051 INFO __main__: Message delivered to dev.topic.events.v1 [0]
+2026-07-31 15:29:40,000 INFO __main__: Send: {'specversion': '1.0', 'type': 'dbt.source.freshness.v1', 'source': 'dbt.freshness', 'id': '1785500980', 'time': DateTime(2026, 7, 31, 15, 29, 40, 187, tzinfo=Timezone('Europe/Moscow')), 'data': {'unique_id': 'source.dwh_trino.prc_ska_rto_raw_0075_000_cloud.v_d_aum_whs_art_day_m', 'max_loaded_at': DateTime(2026, 7, 31, 15, 16, 38, tzinfo=Timezone('Europe/Moscow')), 'snapshotted_at': DateTime(2026, 7, 31, 15, 29, 40, 55, tzinfo=Timezone('Europe/Moscow')), 'max_loaded_at_time_ago_in_s': -782.000055, 'status': <FreshnessStatus.PASS: 'pass'>, 'thread_id': 'Thread-4 (worker)', 'execution_time': 3.945}}
+2026-07-31 15:29:40,007 INFO __main__: Message delivered to dev.topic.events.v1 [0]
+2026-07-31 15:30:00,000 INFO __main__: Send: {'specversion': '1.0', 'type': 'dbt.source.freshness.v1', 'source': 'dbt.freshness', 'id': '1785501000', 'time': DateTime(2026, 7, 31, 15, 30, 0, 189, tzinfo=Timezone('Europe/Moscow')), 'data': {'unique_id': 'source.dwh_trino.prc_knaa_raw_0075_000_cloud.v_d_aum_whs_art_day_m', 'max_loaded_at': DateTime(2026, 7, 31, 15, 9, 59, tzinfo=Timezone('Europe/Moscow')), 'snapshotted_at': DateTime(2026, 7, 31, 15, 30, 0, 38, tzinfo=Timezone('Europe/Moscow')), 'max_loaded_at_time_ago_in_s': -1201.000038, 'status': <FreshnessStatus.ERROR: 'error'>, 'thread_id': 'Thread-4 (worker)', 'execution_time': 2.129}}
+2026-07-31 15:30:00,006 INFO __main__: Message delivered to dev.topic.events.v1 [0]
+```
+
+До кафки доставляются:
+
+![](../../img/t3-test-producer.png)
+
+
+
+

@@ -6,6 +6,7 @@
 4. [Топики](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-1/t2-l4/)
 5. [Настройка репликации](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-1/t2-l5/)
 6. [Сериализация и десериализация данных](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-1/t2-l7/)
+7. [Практическая работа 2](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-1/t3-practice/)
 
 
 
