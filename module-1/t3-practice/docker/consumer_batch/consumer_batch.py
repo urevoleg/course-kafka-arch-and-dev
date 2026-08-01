@@ -106,7 +106,6 @@ def basic_consume_loop(consumer: DeserializingConsumer | Consumer, topics: t.Lis
         while running:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
-                counter = 0
                 continue
 
             if msg.error():
@@ -124,6 +123,7 @@ def basic_consume_loop(consumer: DeserializingConsumer | Consumer, topics: t.Lis
                     if counter % batch_size == 0:
                         logger.info('Batch commiting...')
                         consumer.commit(asynchronous=False)
+                        counter = 0
                     counter+=1
                 except Exception as e:
                     logger.error(f'Error during message processing: {str(e)}')
