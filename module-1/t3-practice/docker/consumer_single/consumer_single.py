@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 consumer_conf = {'bootstrap.servers': os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092,127.0.0.1:9093"),
         'group.id': 'consumer_single',
-        'enable.auto.commit': 'true', # at least once guarantee https://docs.confluent.io/kafka-clients/python/current/overview.html#at-least-once-guarantee
-        'enable.auto.offset.store': 'false',
+        'enable.auto.commit': 'true', # at least once guarantee https://docs.confluent.io/kafka-clients/python/current/overview.html#default-guarantee
+        'enable.auto.offset.store': 'true',
         'auto.offset.reset': 'latest'}
 
 
@@ -75,7 +75,8 @@ class CloudEvent(BaseModel):
 
 def message_process(message: Message) -> None:
     value = message.value()
-    logger.info(f'Processing message: {value}')
+    logger.info(f'Processing message: {value}\n'
+                f'Offset: {message.offset()}')
 
     match value.data.status:
         case FreshnessStatus.WARN:

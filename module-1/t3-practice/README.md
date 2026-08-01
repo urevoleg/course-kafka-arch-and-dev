@@ -54,7 +54,7 @@ docker compose -f docker-compose.kafka.yaml up -d
 
 ![t3-complete.png](../../img/t3-complete.png)
 
-Переходи в Kafka-UI: http://127.0.0.1:8081 и разглядывай что producer пишет или загляни в логи producer/consumer чтобы видеть, что у них всё ОК
+Переходи в Kafka-UI: http://127.0.0.1:8080 и разглядывай что producer пишет или загляни в логи producer/consumer чтобы видеть, что у них всё ОК
 
 3. Заглянуть в логи
 

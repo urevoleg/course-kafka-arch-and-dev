@@ -169,6 +169,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092,kafka-broker-2:29093
       SCHEMA_REGISTRY_URL: http://schema-registry:8081
       KAFKA_TOPIC: dev.topic.events.v1
+      MSG_BATCH_SIZE: 10
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -186,3 +187,56 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092,kafka-broker-2:29093
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+    # ========== МОНИТОРИНГ (профиль monitoring) ==========
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: kafka-exporter
+    profiles:
+      - monitoring
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    command:
+      - '--kafka.server=kafka:29092'
+      - '--kafka.server=kafka-broker-2:29093'
+    ports:
+      - "9308:9308"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    profiles:
+      - monitoring
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    profiles:
+      - monitoring
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      # Автоматическая настройка источника данных
+      - GF_DATASOURCES_PROMETHEUS_URL=http://prometheus:9090
+      - GF_DATASOURCES_PROMETHEUS_ACCESS=proxy
+      - GF_DATASOURCES_PROMETHEUS_IS_DEFAULT=true
+      - GF_DATASOURCES_PROMETHEUS_NAME=Prometheus
+      - GF_DATASOURCES_PROMETHEUS_TYPE=prometheus
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./prometheus_datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml:ro
+      - ./dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./25462_rev1.json:/var/lib/grafana/dashboards/kafka-dashboard.json:ro
+    restart: unless-stopped
+
+volumes:
+  grafana-storage:

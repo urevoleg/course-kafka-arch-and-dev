@@ -79,7 +79,8 @@ class CloudEvent(BaseModel):
 
 def message_process(message: Message) -> None:
     value = message.value()
-    logger.info(f'Processing message: {value}')
+    logger.info(f'Processing message: {value}\n'
+                f'Offset: {message.offset()}')
 
     match value.data.status:
         case FreshnessStatus.WARN:
@@ -100,6 +101,7 @@ def basic_consume_loop(consumer: DeserializingConsumer | Consumer, topics: t.Lis
         consumer.subscribe(topics)
 
         counter = 0
+        batch_size = int(os.getenv("MSG_BATCH_SIZE", 10))
 
         while running:
             msg = consumer.poll(timeout=1.0)
@@ -118,7 +120,10 @@ def basic_consume_loop(consumer: DeserializingConsumer | Consumer, topics: t.Lis
             else:
                 try:
                     message_process(msg)
-                    consumer.commit(asynchronous=False)
+
+                    if counter % batch_size == 0:
+                        logger.info('Batch commiting...')
+                        consumer.commit(asynchronous=False)
                     counter+=1
                 except Exception as e:
                     logger.error(f'Error during message processing: {str(e)}')
