@@ -114,28 +114,31 @@ services:
         kafka-topics --bootstrap-server kafka:29092,kafka-broker-2:29093 \
           --create \
           --if-not-exists \
-          --topic topic.events.v1 \
-          --partitions 3 \
-          --replication-factor 2
-        kafka-topics --describe --topic topic.events.v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
-        kafka-topics --bootstrap-server kafka:29092,kafka-broker-2:29093 \
-          --create \
-          --if-not-exists \
           --topic dev.topic.events.v1 \
           --partitions 3 \
           --replication-factor 2
         kafka-topics --describe --topic dev.topic.events.v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
+        kafka-topics --bootstrap-server kafka:29092,kafka-broker-2:29093 \
+          --create \
+          --if-not-exists \
+          --topic input.topic.events.v1 \
+          --partitions 3 \
+          --replication-factor 2
+        kafka-topics --describe --topic input.topic.events.v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
+        kafka-topics --bootstrap-server kafka:29092,kafka-broker-2:29093 \
+          --create \
+          --if-not-exists \
+          --topic output.topic.events.v1 \
+          --partitions 3 \
+          --replication-factor 2
+        kafka-topics --describe --topic output.topic.events.v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui-course
     depends_on:
-      kafka:
-        condition: service_healthy
-      kafka-broker-2:
-        condition: service_healthy
-      schema-registry:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     ports:
       - "8080:8080"
     environment:

@@ -9,3 +9,4 @@ Apache Kafka course in MagnitTech by [ЯндексПрактикум PRO](https:
 ## Table of content
 
 - [Module 1: Базовая эксплуатация Apache Kafka](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-1) 
+- [Module 2: Реализация потоковой обработки на базе Apache Kafka](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-2) 
