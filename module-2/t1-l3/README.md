@@ -226,3 +226,9 @@ windowed_table = app.Table(
 
 
 ![](../../img/m2-t1-l3-agent-windowing.png)
+
+
+------
+
+
+В примере курса использованы `@app.page('/windowed_stats/{user_id}')` - [official docs](https://faust.readthedocs.io/en/latest/userguide/tasks.html#web-views)
