@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 import os
 import logging
@@ -47,8 +48,7 @@ def _raise_if_not_env_value(env_name: str):
 
 app = faust.App(
         "table_user_stats",
-        broker=_raise_if_not_env_value("KAFKA_BOOTSTRAP_SERVERS"),
-        value_serializer="raw"
+        broker=_raise_if_not_env_value("KAFKA_BOOTSTRAP_SERVERS")
 )
 
 
@@ -72,24 +72,24 @@ user_events_topic = app.topic(INPUT_KAFKA_TOPIC, value_type=UserEvent)
 @app.agent(user_events_topic)
 async def process(events):
     async for event in events:
-       # Обновляем общую статистику
-       stats = user_stats_table[event.user_id]
-       if stats is None:
+        # Обновляем общую статистику
+        stats = user_stats_table[event.user_id]
+        if stats is None:
            stats = UserStats()
-       stats.total_events += 1
-       stats.last_event_time = event.timestamp
-       stats.total_value += event.value
-       user_stats_table[event.user_id] = stats
+        stats.total_events += 1
+        stats.last_event_time = event.timestamp
+        stats.total_value += event.value
+        user_stats_table[event.user_id] = stats
 
 
-       # Обновляем статистику по временному окну
-       window = user_windowed_stats_table[event.user_id].now()
-       if window is None:
+        # Обновляем статистику по временному окну
+        window = user_windowed_stats_table[event.user_id].now()
+        if window is None:
            window = UserStats()
-       window.total_events += 1
-       window.last_event_time = event.timestamp
-       window.total_value += event.value
-       user_windowed_stats_table[event.user_id] = window
+        window.total_events += 1
+        window.last_event_time = event.timestamp
+        window.total_value += event.value
+        user_windowed_stats_table[event.user_id] = window
 
 
 @app.page('/stats/{user_id}')
@@ -119,7 +119,7 @@ async def get_user_stats(web, request, user_id):
 @app.page('/windowed_stats/{user_id}')
 async def get_windowed_stats(web, request, user_id):
    try:
-       window = windowed_stats[user_id].now()
+       window = user_windowed_stats_table[user_id].now()
        if window is None:
            return web.json({
                'user_id': user_id,
@@ -140,3 +140,7 @@ async def get_windowed_stats(web, request, user_id):
            'error': str(e),
            'user_id': user_id
        }, status=500)
+
+
+if __name__ == "__main__":
+    app.main()
