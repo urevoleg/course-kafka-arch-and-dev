@@ -156,3 +156,73 @@ app = faust.App(
 ## Что такое Table (detailed)
 
 
+Создание таблицы - таблица создается в момент объевления в коде:
+
+```python
+table = app.Table(
+    "table-name",
+    partitions=1,    # Количество партиций
+    default=int,     # Функция или тип для пропущенных ключей
+)
+```
+
+Модифицировать данные таблицы можно только из потока, внутри цикла:
+
+```python
+async for event in stream:
+    # some code below
+    table['key'] += 1
+```
+
+
+Итерирование по таблице аналогично итерированию по словарю:
+
+```python
+for key, value in table.items():
+    print(f"{key}: {value}")
+```
+
+### Changelog
+
+Каждое изменение таблицы попадает в специальный топик `changelog`, это позволяет восстановить данные после сбоя, сохранение происходит в 
+момент модицифкации таблицы
+
+
+ ### Windowing
+
+Примеры
+
+**Tumbling (статическое) window**
+
+```python
+from datetime import timedelta
+
+windowed_table = app.Table(
+    "tumbling-table",
+    default=int,
+).tumbling(
+    timedelta(minutes=1),
+    expires=timedelta(hours=1), # - ??
+)
+```
+
+
+**Hopping (пересекающееся) window**
+
+
+```python
+from datetime import timedelta
+
+windowed_table = app.Table(
+    "hopping-table",
+    default=int,
+).hopping(
+    60,
+    30,
+    expires=timedelta(hours=1),
+    key_index=True
+)
+```
+
+
+![](../../img/m2-t1-l3-agent-windowing.png)
