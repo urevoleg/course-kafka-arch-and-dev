@@ -106,27 +106,15 @@ CREATE STREAM events__stream (
 
 Также новые потоки можно создавать через `create stream <name> as select * from <another-stream>`:
 
--- кол-во покупок и их сумма
+-- покупки
 ```sql
 CREATE STREAM purchase_by_user AS
-SELECT user_id
-    , count(1) as purchases
-    , sum(value) as total_revenue
+SELECT *
 FROM events__stream
 WHERE event_type = 'purchase'
-group by user_id
 EMIT CHANGES; 
 ```
 
--- кол-во событий
-```sql
-CREATE STREAM events_by_user AS
-SELECT user_id
-    , count(1) as events
-FROM events__stream
-group by user_id
-EMIT CHANGES; 
-```
 
 ### Создание таблиц
 
@@ -143,6 +131,81 @@ CREATE TABLE user_table (
 );
 ```
 
+Таблицы использются для агрегатов, например
+
+```sql
+CREATE or replace TABLE purchase_by_user
+WITH (
+  KAFKA_TOPIC = 'PURCHASE_BY_USER',
+  VALUE_FORMAT = 'JSON',
+  PARTITIONS = 3,
+  REPLICAS = 2
+) AS
+SELECT
+  user_id,
+  COUNT(*) AS purchases,
+  SUM(value) AS total_revenue
+FROM events__stream
+WHERE event_type = 'purchase'
+GROUP BY user_id
+EMIT CHANGES;
+```
+
+-- события
+```sql
+CREATE or replace TABLE events_by_user
+WITH (
+  KAFKA_TOPIC = 'events_by_user',
+  VALUE_FORMAT = 'JSON',
+  PARTITIONS = 3,
+  REPLICAS = 2
+) AS
+SELECT
+  user_id,
+  COUNT(*) AS events,
+FROM events__stream
+GROUP BY user_id
+EMIT CHANGES;
+```
+
+-- первое событие пользователя
+```sql
+-- событие
+CREATE or replace TABLE first_events_by_user
+WITH (
+  KAFKA_TOPIC = 'first_events_by_user',
+  VALUE_FORMAT = 'JSON',
+  PARTITIONS = 3,
+  REPLICAS = 2
+) AS
+SELECT
+  user_id,
+  min(timestamp) as ts
+FROM events__stream
+GROUP BY user_id
+EMIT CHANGES;
+
+-- покупка
+CREATE or replace TABLE first_purchase_by_user
+WITH (
+  KAFKA_TOPIC = 'first_purchase_by_user',
+  VALUE_FORMAT = 'JSON',
+  PARTITIONS = 3,
+  REPLICAS = 2
+) AS
+SELECT
+  user_id,
+  min(timestamp) as ts
+FROM events__stream
+WHERE event_type = 'purchase'
+GROUP BY user_id
+EMIT CHANGES;
+```
+
+#### qna
+
+При создании таблицы обрабатываются все данные находящиеся в топике/потоке ?
+
 ### Удаление
 
 
@@ -153,8 +216,18 @@ drop stream <stream-name> delete topic;
 
 -- поток c удалением топика
 drop stream <stream-name> delete topic;
+
+-- таблица
+drop table <table-name>
 ```
 
 ### JOINs
+
+Поддерживаются не все виды JOIN: INNER JOIN, LEFT JOIN и OUTER JOIN.
+
+Сущностей 2: Table and stream, поэтому возожны 3 комбинации:
+- stream-table join
+- table-table
+- stream-stream - наиболее ресурсоемкая операция
 
 
