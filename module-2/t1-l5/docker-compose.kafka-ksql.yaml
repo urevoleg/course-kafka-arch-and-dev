@@ -118,6 +118,14 @@ services:
           --partitions 3 \
           --replication-factor 2
         kafka-topics --describe --topic dev.topic.events.v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
+        # дубль для проверки ksqlDB
+        kafka-topics --bootstrap-server kafka:29092,kafka-broker-2:29093 \
+          --create \
+          --if-not-exists \
+          --topic dev_ksql_topic_events_v1 \
+          --partitions 3 \
+          --replication-factor 2
+        kafka-topics --describe --topic dev_ksql_topic_events_v1 --bootstrap-server kafka:29092,kafka-broker-2:29093
         kafka-topics --bootstrap-server kafka:29092,kafka-broker-2:29093 \
           --create \
           --if-not-exists \
@@ -145,6 +153,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092,kafka-broker-2:29093
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_KSQLDBSERVER: http://ksqldb-server:8088 # для подключения ksqlDB в UI
 
   ksqldb-server:
     image: confluentinc/ksqldb-server:latest
