@@ -65,3 +65,96 @@ EMIT CHANGES;
 ![](../../img/m2-t1-l5-ksql-kafka-ui.png)
 
 
+## Создание потоков в ksqlDB
+
+### Дисклеймер: Два брокера и KSQLDB
+
+В учебной конфигурации запущены два Kafka-брокера. Для работы транзакций KSQLDB
+создает системный топик `__transaction_state`, поэтому в
+`docker-compose.kafka-ksql.yaml` для обоих брокеров заданы:
+
+```yaml
+KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+```
+
+Replication factor не может быть больше числа доступных брокеров. После изменения
+этих параметров перезапустите брокеры и KSQLDB:
+
+```bash
+docker compose -f module-2/t1-l5/docker-compose.kafka-ksql.yaml up -d --force-recreate kafka kafka-broker-2 ksqldb-server
+```
+
+Топик `dev.topic.events.v1` уже создан с тремя партициями. При регистрации
+существующего топика в KSQLDB укажите то же число:
+
+```sql
+CREATE STREAM events__stream (
+  user_id STRING,
+  event_type STRING,
+  timestamp STRING,
+  value DOUBLE
+) WITH (
+  KAFKA_TOPIC = 'dev.topic.events.v1',
+  VALUE_FORMAT = 'JSON',
+  PARTITIONS = 3
+);
+```
+
+При выставлении `timestamp TIMESTAMP` - получаю ошибку чтения (понять, как парсить ? или нужна явная схема на топик ?), даты сериализуются как числа
+[docs](https://docs.confluent.io/platform/current/ksqldb/reference/serialization.html#timestamp-serialization) или вариант сериализация через SR.
+
+Также новые потоки можно создавать через `create stream <name> as select * from <another-stream>`:
+
+-- кол-во покупок и их сумма
+```sql
+CREATE STREAM purchase_by_user AS
+SELECT user_id
+    , count(1) as purchases
+    , sum(value) as total_revenue
+FROM events__stream
+WHERE event_type = 'purchase'
+group by user_id
+EMIT CHANGES; 
+```
+
+-- кол-во событий
+```sql
+CREATE STREAM events_by_user AS
+SELECT user_id
+    , count(1) as events
+FROM events__stream
+group by user_id
+EMIT CHANGES; 
+```
+
+### Создание таблиц
+
+Table в ksqlDB является аналогом kTable в KafkaStreams (также хранит последнее состояние данных по ключу):
+
+```sql
+CREATE TABLE user_table (
+    user_id STRING,
+    user_email STRING
+) WITH (
+    KAFKA_TOPIC = 'table-input-topic',
+    VALUE_FORMAT = 'JSON',
+    KEY = 'user_id'
+);
+```
+
+### Удаление
+
+
+```sql
+-- поток
+drop stream <stream-name> delete topic;
+
+
+-- поток c удалением топика
+drop stream <stream-name> delete topic;
+```
+
+### JOINs
+
+
