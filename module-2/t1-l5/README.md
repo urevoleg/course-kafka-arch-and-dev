@@ -230,4 +230,111 @@ drop table <table-name>
 - table-table
 - stream-stream - наиболее ресурсоемкая операция
 
+Пример:
 
+```sql
+select e.user_id
+  , e.ts as first_event_ts
+  , p.ts as first_purchase_ts
+from first_events_by_user e
+left join first_purchase_by_user p
+on e.user_id = p.user_id
+where p.ts is not null
+emit changes
+limit 10;
+```
+
+Все вышесозданные таблицы:
+
+```sql
+select e.user_id
+  , e.events
+  , p.purchases
+  , cast(p.purchases as double) / e.events as cr -- классика для Java/C, int/int -> 0
+  , fe.ts as first_event_ts
+  , fp.ts as first_purchase_ts
+from first_events_by_user fe
+inner join events_by_user e
+on fe.user_id = e.user_id
+left join first_purchase_by_user fp
+on fe.user_id = fp.user_id
+left join purchase_by_user p
+on fe.user_id = p.user_id
+emit changes
+limit 10;
+```
+
+
+### Группировка и агрегирование
+
+Можно использовать задание окна, пример
+
+```sql
+CREATE TABLE views_per_region AS
+SELECT region_id, COUNT(*) as count
+FROM main_video_views
+WINDOW TUMBLING (SIZE 1 HOUR) -- откуда считается время ? можно ли его изменить ?
+GROUP BY region_id
+EMIT CHANGES; -- что делает emit changes ?
+```
+
+### repartitioning
+
+Перепартиционирование помогает оптимизировать распределение данных в кластере и в результате повысить производительность и масштабируемость системы
+
+**Пример:**
+
+```sql
+CREATE STREAM REPARTITIONED_EVENTS_STREAM 
+AS 
+SELECT * FROM EVENTS__STREAM
+PARTITION BY USER_ID EMIT CHANGES;
+```
+
+Есть нюансы:
+- перераспределить - буквально будет копия топика с другим распределением
+- ключ распределения по дефолту уходить из тела сообщения, пример ниже
+
+```json
+# исходное сообщение
+{
+	"user_id": "user002",
+	"event_type": "purchase",
+	"timestamp": "2026-10-31T10:28:04.778123",
+	"value": 996.8
+}
+
+# после перераспределения
+{
+	"EVENT_TYPE": "purchase",
+	"TIMESTAMP": "2026-10-31T17:38:26.270235",
+	"VALUE": 456.47
+}
+```
+
+чтобы оставить ключ в теле сообщения нужен такой синтаксис:
+
+```sql
+AS_VALUE(user_id) AS user_id,  -- Сохраняем user_id в теле сообщения 
+```
+
+
+Для полного repartition необходимо действовать из консоли (ksql):
+
+```bash
+docker exec -it <имя_контейнера_ksqldb_server> ksql
+
+SET 'auto.offset.reset'='earliest';
+CREATE STREAM REPARTITIONED_EVENTS_STREAM 
+AS 
+SELECT * FROM EVENTS__STREAM
+PARTITION BY USER_ID EMIT CHANGES;
+```
+
+Распределение сообщений до и после:
+
+ДО:
+![](../../img/m2-t1-l5-repartition-before.png)
+
+ПОСЛЕ:
+![](../../img/m2-t1-l5-repartition-after.png)
