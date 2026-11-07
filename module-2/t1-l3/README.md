@@ -232,3 +232,8 @@ windowed_table = app.Table(
 
 
 В примере курса использованы `@app.page('/windowed_stats/{user_id}')` - [official docs](https://faust.readthedocs.io/en/latest/userguide/tasks.html#web-views)
+
+
+-----------
+
+⏩ [Main](https://github.com/urevoleg/course-kafka-arch-and-dev)

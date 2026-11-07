@@ -338,3 +338,9 @@ PARTITION BY USER_ID EMIT CHANGES;
 
 ПОСЛЕ:
 ![](../../img/m2-t1-l5-repartition-after.png)
+
+
+
+-----------
+
+⏩ [Main](https://github.com/urevoleg/course-kafka-arch-and-dev)

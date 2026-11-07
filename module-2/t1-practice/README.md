@@ -265,3 +265,8 @@ drwxr-xr-x  2 root root 4.0K Nov  7 09:45 blocked-backups
 > 
 > Есть предположение, что join тоже будет что-то типа hash
 > 
+
+
+-----------
+
+⏩ [Main](https://github.com/urevoleg/course-kafka-arch-and-dev)
