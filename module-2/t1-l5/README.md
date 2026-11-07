@@ -82,7 +82,7 @@ Replication factor не может быть больше числа доступ
 этих параметров перезапустите брокеры и KSQLDB:
 
 ```bash
-docker compose -f module-2/t1-l5/docker-compose.kafka-ksql.yaml up -d --force-recreate kafka kafka-broker-2 ksqldb-server
+docker compose -f module-2/t1-l2-l5/docker-compose.kafka-ksql.yaml up -d --force-recreate kafka kafka-broker-2 ksqldb-server
 ```
 
 Топик `dev.topic.events.v1` уже создан с тремя партициями. При регистрации
