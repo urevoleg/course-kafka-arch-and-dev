@@ -18,6 +18,8 @@
 
 👉 [Балансировка партиций и инструменты администрирования](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-3/t1-l3)
 
+👉 [Мониторинг](https://github.com/urevoleg/course-kafka-arch-and-dev/tree/main/module-3/t1-l4)
+
 -----------
 
 ⏩ [Main](https://github.com/urevoleg/course-kafka-arch-and-dev)
