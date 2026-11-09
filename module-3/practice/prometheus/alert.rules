@@ -1,0 +1,40 @@
+groups:
+- name: targets
+  rules:
+  - alert: monitor_service_down
+    expr: up == 0
+    for: 5s
+    labels:
+      severity: critical
+    annotations:
+      summary: "Monitor service non-operational"
+      description: "Service {{ $labels.instance }} is down."
+
+- name: kafka
+  rules:
+  - alert: kafka_broker_not_stable
+    expr: kafka_server_brokerstate != 3
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Kafka broker {{ $labels.instance }} is not STABLE"
+      description: "Broker state is {{ $value }} (3 = STABLE)."
+
+  - alert: kafka_offline_partitions
+    expr: kafka_controller_offlinepartitionscount > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Offline partitions detected"
+      description: "Active controller ({{ $labels.instance }}) sees {{ $value }} offline partition(s)."
+
+  - alert: kafka_under_replicated_partitions
+    expr: kafka_server_replica_manager_underreplicatedpartitions > 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Under-replicated partitions on {{ $labels.instance }}"
+      description: "Broker has {{ $value }} under-replicated partition(s) for more than 5m."

@@ -1,0 +1,200 @@
+# Simple-стек: 2 брокера Kafka + Schema Registry + мониторинг
+# (danielqsj/kafka-exporter + blackbox-exporter -> Prometheus -> Grafana)
+#
+# Host-порты смещены (9097/9098, 8082, 2182, 9091, 3002), чтобы стек можно
+# было поднимать одновременно с "полным" practice (9092-9094, 8081, 2181, 9090, 3001).
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    hostname: zookeeper
+    container_name: zookeeper-simple
+    user: root
+    ports:
+      - "2182:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 200
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc -w 2 localhost 2181 | grep Zookeeper"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - proxynet
+
+  kafka01:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka01
+    container_name: kafka-simple-01
+    user: root
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9097:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_SCHEMA_REGISTRY_URL: "schema-registry:8081"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9097,PLAINTEXT_INTERNAL://kafka01:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - proxynet
+
+  kafka02:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka02
+    container_name: kafka-simple-02
+    user: root
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9098:9092"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_SCHEMA_REGISTRY_URL: "schema-registry:8081"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9098,PLAINTEXT_INTERNAL://kafka02:29093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - proxynet
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    depends_on:
+      kafka01:
+        condition: service_healthy
+      kafka02:
+        condition: service_healthy
+    ports:
+      - "8082:8081"
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka01:29092,PLAINTEXT://kafka02:29093
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c 'echo > /dev/tcp/localhost/8081' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - proxynet
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-init-simple
+    depends_on:
+      kafka01:
+        condition: service_healthy
+      kafka02:
+        condition: service_healthy
+    command:
+      - /bin/bash
+      - -c
+      - |
+        kafka-topics --bootstrap-server kafka01:29092,kafka02:29093 \
+          --create --if-not-exists --topic topic.events.v1 \
+          --partitions 2 --replication-factor 2
+        kafka-topics --describe --topic topic.events.v1 --bootstrap-server kafka01:29092,kafka02:29093
+        kafka-topics --bootstrap-server kafka01:29092,kafka02:29093 \
+          --create --if-not-exists --topic dev.topic.events.v1 \
+          --partitions 2 --replication-factor 2
+        kafka-topics --describe --topic dev.topic.events.v1 --bootstrap-server kafka01:29092,kafka02:29093
+    networks:
+      - proxynet
+
+  # ========== МОНИТОРИНГ (экспортёры -> Prometheus -> Grafana) ==========
+
+  # Взгляд на кластер со стороны клиента: брокеры, топик/партиции/оффсеты,
+  # consumer groups. Дашборд: Kafka Exporter Overview (grafana.com/7589).
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:${KAFKA_EXPORTER_VERSION}
+    container_name: kafka-exporter
+    depends_on:
+      kafka01:
+        condition: service_healthy
+      kafka02:
+        condition: service_healthy
+    command:
+      - --kafka.server=kafka01:29092
+      - --kafka.server=kafka02:29093
+    ports:
+      - "9308:9308"
+    networks:
+      - proxynet
+
+  # Пробы доступности: HTTP-эндпоинт SR и TCP-порты брокеров.
+  # Дашборд: Blackbox Exporter (grafana.com/18896).
+  blackbox-exporter:
+    image: prom/blackbox-exporter:${BLACKBOX_VERSION}
+    container_name: blackbox-exporter
+    command:
+      - '--config.file=/etc/blackbox/blackbox.yml'
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    networks:
+      - proxynet
+
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION}
+    container_name: prometheus-simple
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command: "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9091:9090"
+    restart: unless-stopped
+    networks:
+      - proxynet
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION}
+    container_name: grafana-simple
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_PATHS_DATA=/var/lib/grafana
+      - GF_SECURITY_ADMIN_PASSWORD=kafka
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - proxynet
+
+networks:
+  # одна сеть для всех: экспортёры должны быть в той же сети, что и цели проб
+  proxynet:
+
+volumes:
+  grafana-storage:

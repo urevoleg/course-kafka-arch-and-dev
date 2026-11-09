@@ -1,0 +1,42 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # danielqsj/kafka-exporter: метрики kafka_* (брокеры, топик/партиции/оффсеты, consumer groups)
+  - job_name: 'kafka-exporter'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+
+  # blackbox: HTTP-проба Schema Registry (модуль http_2xx).
+  # SR 7.6.0 не имеет /health, но корень отвечает 200, пока процесс жив
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - 'http://schema-registry:8081/'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # blackbox: TCP-пробы портов брокеров (модуль tcp)
+  - job_name: 'blackbox-tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp]
+    static_configs:
+      - targets:
+          - 'kafka01:29092'
+          - 'kafka02:29093'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

@@ -83,6 +83,9 @@ SRE-инженеры ориентируются не только на uptime, �
 - Zabbix (server + proxy + agent, push model)
 - Prometheus (server + time-series db + alertmanager + exporters, pull model)
 
+
+
+
 -----------
 
 ⏩ [Main](https://github.com/urevoleg/course-kafka-arch-and-dev)

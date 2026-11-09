@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert.rules"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  # JMX-экспортёры sscaling/jmx-prometheus-exporter:
+  # 3 брокера + Schema Registry (у каждого свой JMX-порт)
+  - job_name: 'kafka-jmx'
+    static_configs:
+      - targets:
+          - 'jmx-kafka101:5556'          # брокер kafka01 (9991)
+          - 'jmx-kafka102:5556'          # брокер kafka02 (9992)
+          - 'jmx-kafka103:5556'          # брокер kafka03 (9993)
+          - 'jmx-schema-registry:5556'   # SR (schema-registry:9994)
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

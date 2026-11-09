@@ -1,0 +1,117 @@
+#---------------------------------------------------------------------------------------------------------
+# Schema Registry JMX Metrics :
+# Compatible with Confluent Platform 7.6.0 (SCHEMA_REGISTRY_JMX_PORT=9994)
+#
+# SR сам по себе не публикует предметные JMX MBean'ы (метрики REST-апика —
+# через Spring Boot Actuator, а не JMX), поэтому сюда попадают только
+# JVM/OS-метрики: heap, GC, память, потоки, CPU.
+# Имена метрик совпадают с JVM-секцией брокеров (kafka_jvm_*), чтобы SR
+# появлялся в дашборде "broker_jvm_os" как ещё один instance.
+#---------------------------------------------------------------------------------------------------------
+hostPort: schema-registry:9994
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+#Whitelist is used to reduce scrapping time
+whitelistObjectNames:
+  - java.lang:*
+blacklistObjectNames:
+  - java.lang:type=ClassLoading,*
+  - java.lang:type=Compilation,*
+  - java.lang:type=MemoryManager,*
+
+rules:
+  #-------------------------------------------------------------------------------------------------------
+  # JVM GarbageCollector
+  #-------------------------------------------------------------------------------------------------------
+  - pattern: 'java.lang<type=GarbageCollector, name=(.*)><>CollectionCount'
+    name: kafka_jvm_gc_collection_count
+    labels:
+      name: $1
+      service: schema-registry
+      env: cluster-demo
+
+  - pattern: 'java.lang<type=GarbageCollector, name=(.*)><>CollectionTime'
+    name: kafka_jvm_gc_collection_time
+    labels:
+      name: $1
+      service: schema-registry
+      env: cluster-demo
+
+  - pattern: java.lang<type=GarbageCollector,name=(.*)><LastGcInfo, duration>
+    name: kafka_jvm_last_gc_duration
+    labels:
+      name: $1
+      service: schema-registry
+      env: cluster-demo
+    attrNameSnakeCase: true
+
+  - pattern: 'java.lang<type=GarbageCollector, name=([^,]+), key=(.*)><LastGcInfo, memoryUsage(\w+)Gc>(\w+)'
+    name: kafka_jvm_last_gc_memory_usage_$4
+    labels:
+      name: $1
+      space: $2
+      type: $4
+      service: schema-registry
+      env: cluster-demo
+    attrNameSnakeCase: true
+
+  #-------------------------------------------------------------------------------------------------------
+  # JVM Memory
+  #-------------------------------------------------------------------------------------------------------
+  - pattern: java.lang<type=Memory><HeapMemoryUsage>(\w*)
+    name: kafka_jvm_heap_usage
+    labels:
+      type: $1
+      service: schema-registry
+      env: cluster-demo
+    attrNameSnakeCase: true
+
+  - pattern: java.lang<type=Memory><NonHeapMemoryUsage>(\w*)
+    name: kafka_jvm_non_heap_usage
+    labels:
+      type: $1
+      service: schema-registry
+      env: cluster-demo
+    attrNameSnakeCase: true
+
+  - pattern: 'java.lang<type=MemoryPool, name=(.*)><CollectionUsage>(\w*)'
+    name: kafka_jvm_memory_pool_collection_usage
+    labels:
+      name: $1
+      type: $2
+      service: schema-registry
+      env: cluster-demo
+  - pattern: 'java.lang<type=MemoryPool, name=(.*)><Usage>(\w*)'
+    name: kafka_jvm_memory_pool_usage
+    labels:
+      name: $1
+      type: $2
+      service: schema-registry
+      env: cluster-demo
+  - pattern: 'java.lang<type=MemoryPool, name=(.*)><PeakUsage>(\w*)'
+    name: kafka_jvm_memory_pool_peak_usage
+    labels:
+      name: $1
+      type: $2
+      service: schema-registry
+      env: cluster-demo
+
+  #-------------------------------------------------------------------------------------------------------
+  # JVM Thread
+  #-------------------------------------------------------------------------------------------------------
+  - pattern: java.lang<type=Threading><>(\w*thread_count)
+    name: kafka_jvm_$1
+    labels:
+      service: schema-registry
+      env: cluster-demo
+    attrNameSnakeCase: true
+
+  #-------------------------------------------------------------------------------------------------------
+  # Operating System
+  #-------------------------------------------------------------------------------------------------------
+  - pattern: java.lang<type=OperatingSystem><>(\w*)
+    name: kafka_jvm_os_$1
+    labels:
+      service: schema-registry
+      env: cluster-demo

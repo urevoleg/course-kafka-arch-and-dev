@@ -1,0 +1,12 @@
+modules:
+  # HTTP GET, успех только при 2xx (используется для SR /health)
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      method: GET
+  # TCP connect (используется для портов брокеров)
+  tcp:
+    prober: tcp
+    timeout: 5s
